@@ -3,13 +3,14 @@ import subprocess
 import shlex
 import sys
 from time import time
+import logging
 # default values
 class HistItem():
     def __init__(self,timestamp,cmd):
         self.ts =  timestamp
         self.cmd = cmd
     def __repr__(self):
-        return "<HistItem ts:%lf command:%d>"%(self.ts,self.cmd)
+        return "<HistItem ts:%lf command:%s>"%(self.ts,self.cmd)
         
 class Node():
     def __init__(self,ip,nick=None,hst=None,ram=None):
@@ -106,9 +107,23 @@ class ownParser(parser):
     def togglesuper(self,args):
         self.chat.super = not self.chat.super
     def raw(self,args):
-        self.chat.send_mc(' '.join(args))
+        msg = ' '.join(args)
+        logging.debug("RAW:%s"%msg)
+        #msg = ' '.join(args)
+        self.chat.send_mc(msg)
     def py (self,args):
         return eval(" ".join(args))
+    def hist (self,args):
+        str = ""
+        for (k,i) in self.chat.iplist.items():
+            str +="User: %s\n"%self.chat.resolveNick( k)
+            for h in i.hst:
+                str += "%s\n"%h
+        return str
+    def setall(self,args):
+        for k,v in self.chat.gram.items():
+            self.chat.send_mc("/set \"%s\" \"%s\""%(k,v))
+
     def parse(self,cmd):
         '''
         parses a command string  
@@ -117,12 +132,14 @@ class ownParser(parser):
         it will try/catch unknown commands
         '''
         cmd = cmd[1:]
-        funct = cmd.split()[0]
-        #print cmd
+        #cmd  = shlex.split(cmd)
+        cmd = cmd.split()
+        funct = cmd[0]
+        logging.debug(cmd)
         try:
-            return getattr(self,funct)(cmd.split()[1:])
-        except:
-            return "no such local command '/%s' : %s" %(cmd,sys.exc_info()[0])
+            return getattr(self,funct)(cmd[1:])
+        except Exception as e:
+            return "no such local command '/%s' : %s" %(cmd,e)
 class remoteParser(parser):
     '''
     parses commands received over the Multicast link and evaluate them
@@ -137,7 +154,7 @@ class remoteParser(parser):
         '''
         
         args = ' '.join(shlex.split(' '.join(args)))
-        print args
+        logging.debug(args)
         msg = "'%s' now known as '%s'" % (self.chat.resolveNick(addr[0]),args)
         self.chat.iplist[addr[0]].nick = args
         return  msg
@@ -157,14 +174,11 @@ class remoteParser(parser):
 
         if the challenge is not taken, the message will be printed out
         '''
-        #print '%s'%args.split()[-1] == '%d'%self.chat.rnd
-        #print int('%s'%args.split()[-1]) == self.chat.rnd
-
         if int(args[-1]) == self.chat.rnd and self.chat.ip is None:
             print "challenge succeeded. Found your IP: %s"%addr[0]
             self.chat.ip=addr[0]
         else:
-            return "hello from %s : %s" % (addr[0],args)
+            return "hello from \"%s\" : \"%s\"" % (addr[0],args)
 
     def beep(self,args,addr):
         '''
@@ -176,7 +190,6 @@ class remoteParser(parser):
         if self.chat.beep==False:
             return "beeping is turned off, ignoring request from %s with freq/length %s"% (addr[0],args)
         cmd = [ "/usr/bin/beep" ]
-        #print arg, len(arg)
         if len(args) >= 1:
             cmd.append("-f%s"%args[0])
         if len(args) >= 2:
@@ -208,6 +221,7 @@ class remoteParser(parser):
         '''
         return "not yet implemented!"
     def echo (self,args,addr):
+        """ replaces the original ``chat'' """
         args = " ".join(args)
         return "%s: %s"%(self.chat.resolveNick(addr[0]), args)
     def parse(self,cmd,addr):
@@ -223,41 +237,51 @@ class remoteParser(parser):
             self.chat.iplist[addr[0]] = Node(addr[0])
         self.chat.iplist[addr[0]].hst.append( HistItem(time(),cmd ) )
         cmd = cmd[1:]
-        funct = cmd.split()[0]
+        logging.debug("REMOTE PARSE:%s"%cmd)
+        cmd = shlex.split(cmd)
+        funct = cmd[0]
         try:
-            return getattr(self,funct)(cmd.split()[1:],addr)
+            return getattr(self,funct)(cmd[1:],addr)
         except Exception as e:
             return "no such remote command '/%s' : %s" %(cmd,e)
+
     def pset(self,args,addr):
-        """saves a value for a node"""
-        self.chat.iplist[addr[0]].ram[args[0]]=' '.join(args[1:])
-        return "for %s: saved %s => %s" %(addr[0],args[0],' '.join(args[1:]))
+         """saves a value for a node"""
+         self.chat.iplist[addr[0]].ram[args[0]]=' '.join(args[1:])
+         return "for %s: saved %s => %s" %(addr[0],args[0],' '.join(args[1:]))
+
     def pget(self,args,addr):
-        ret = self.chat.iplist[addr[0]].ram.get(args[0],None)
-        if ret is None:
-            self.chat.send_mc("/error 404 Not Found")
-        else:
-            self.chat.send_mc("/value %s %s"%(args[0],ret))
+        """tries to retrieve value based on a given key"""
+         ret = self.chat.iplist[addr[0]].ram.get(args[0],None)
+         if ret is None:
+             self.chat.send_mc("/error 404 Not Found")
+         else:
+             self.chat.send_mc("/value %s %s"%(args[0].replace('"','\\"'),ret.replace('"','\\"')))
 
     def set(self,args,addr):
         """
         globally sets a value in all multicast nodes
         """
-        args = shlex.split(" ".join(args))
-        self.chat.gset(args[0]," ".join(args[1:]))
-        return "saved globally %s = %s"%(args[0]," ".join(args[1:]))
+        logging.debug("SET %s"%args)
+        k = args[0]             
+        v = " ".join(args[1:]) 
+        self.chat.gset(k,v)
+        return "saved globally %s = %s"%(k,v)
     def get(self,args,addr):
         """
         tries to retrieve a value globally saved in the struct
         """
-
         ret = self.chat.gget(args[0])
-        print ret
+        # thy shall not unescape thy single ' when inside thy double "
+        key = args[0].replace('"','\\"')#.replace('\'','\\\'')
         if ret is None:
-            self.chat.send_mc("/error 404 Not Found ")
-            return "%s asks for %s, which is unknown to me"%(addr[0],args[0])
-        else:
-            self.chat.send_mc("/set %s %s"%(args[0],ret))
+            self.chat.send_mc("/error 404 %s Not Found "%key)
+            return
+
+        ret = ret.replace('"','\\"')    #.replace('\'','\\\'')
+
+        #return "%s asks for %s, which is unknown to me"%(addr[0],args[0])
+        self.chat.send_mc("/set \"%s\" \"%s\""%(key,ret))
 
     def error(self,args,addr):
         return "Received from %s Error: %s"%(self.chat.resolveNick(addr[0])," ".join(args))

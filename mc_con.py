@@ -43,13 +43,11 @@ class chatter():
         """
         here you may want to add some persistency stuff
         """
-        print value
         self.gram[key] = value
     def gget(self,key):
         """
         persistency goes here
         """
-        print self.gram.get(key,None)
         return self.gram.get(key,None)
 
         pass
