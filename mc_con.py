@@ -7,11 +7,12 @@ import mc_parser
 from select import select
 from threading import Thread
 import mc_remote
+import logging
 #defaults
 GROUP = '224.110.42.23'
 PORT  = 42023
 CLIENTNAME = "Bob Ross"
-MCMESSAGE="/hello %s Says Hello! %s"
+MCMESSAGE="/hello \"%s\" Says Hello! \"%s\""
 chat=None
 # end defaults
 class chatter():
@@ -37,6 +38,8 @@ class chatter():
         self.espeak = True
         self.gram= {}
         self.files = {}
+        self.out_files = {}
+    
     def send_mc(self,arg):
         self.s.sendto("%s" %
                 arg,0,(self.group,self.port))
@@ -95,7 +98,7 @@ class chatter():
         iplist dictionary. if the ip-address is unkown to the
         local host, the ip will be returned
         '''
-        return self.iplist[ip].nick if self.iplist[ip] else ip
+        return self.iplist[ip].nick if ip in self.iplist else ip
         
 
     #########################

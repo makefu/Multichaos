@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import logging
 import random
+import warnings
 # default values
 logging.basicConfig(level=logging.INFO)
 class HistItem():
@@ -142,8 +143,79 @@ class ownParser(parser):
     def ld(self,args):
         """ lists the current downloads"""
         for v in self.chat.files.values():
-            compstr = "[32m[+][0m" if v.complete() else "31m[-]0m" 
+            if v.stopped:
+                compstr = "[33m[#][0m"
+            elif v.complete():
+                compstr = "[32m[+][0m" 
+            else: # running
+                compstr = "[31m[-][0m" 
             print "%s %s : %d of %d fparts"%(
                     compstr,v.filename,len(v.fparts.keys()),v.num_of_seq)
+    def saveas(self,args):
+        """ saves a download to the file to a specific place"""
+        curr_file = self.chat.files[args[0]]
+        if not curr_file.complete():
+            warnings.warn("download not yet completed!")
+        else:
+            outfile= args[1] if len(args) is 2 else args[0]
+            curr_file.unpack(outfile)
+            print "unpacking %s to %s" %(args[0],outfile)
 
+    def stopdl(self,args):
+        """ somewhat tries to ignore specific download """
+        self.chat.files[args[0]].stopdl()
+        return "stopped %s"%args[0]
 
+    def killdl(self,args):
+        curr_file = self.chat.files[args[0]]
+        curr_file.stopdl()
+        curr_file = None
+        return "killed %s"%args[0]
+
+    def startdl(self,args):
+        self.chat.files[args[0]].startdl()
+        return "started %s"%args[0]
+    def lol(self,args):
+        """ be able to set the log level (100(fatal) - 0(debug)) 
+        i am not sure if it really works :("""
+        logging.basicConfig(level=int(args[0]))
+        return "Loglevel is now at %s"%args[0]
+    def sendsf(self,args):
+        """ send string via file interface """
+        fname = args[0] if len(args) > 0 else "custom_string"
+        st    = args[1] if len(args) > 1 else "THIS IS A TEST STRRIIIIING"*2000
+        chsz  = int(args[2]) if len(args) > 2 else 1024 
+            
+        aut = self.chat.out_files[fname]= OutFile(fname,st,chsz,self.chat)
+        aut.send_out()
+
+        
+
+class OutFile:
+    def __init__(self,filename,st,chunksize,chat):
+        self.numchunks = 0
+        self.chunks = self._to_chunks(st,chunksize)
+        self.chsz = chunksize
+        self.fname = filename
+        self.chat = chat
+    def _to_chunks(self,st,chunksize):
+        ret = []
+        rest = st.encode("base64").replace('\n','')
+        while len(rest) > chunksize:
+            ret.append(rest[:chunksize])
+            #print ret
+            rest = rest[chunksize:]
+            #print rest
+        ret.append(rest)
+        print ret
+        self.numchunks = len(ret)
+        return ret
+
+    def send_out(self):
+        for i in range(self.numchunks):
+            print i
+            self.send_chunk(i)
+    def send_chunk(self,chid):
+            logging.debug("sending file :%s num %d"%(self.fname,chid))
+            self.chat.send_mc("/fpart %s %d %d %s" %(
+                self.fname,self.numchunks,chid,self.chunks[chid]))

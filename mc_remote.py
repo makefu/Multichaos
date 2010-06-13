@@ -7,17 +7,25 @@ import logging
 import string
 import warnings
 import threading
-class McFile():
+class InFile():
     def __init__(self,filename,num_of_seq,chat):
         self.filename=filename
         self.num_of_seq=int(num_of_seq)
         self.fparts = {}
         self.chat = chat
+        self.stopped = False
         print "starting watchdog"
         self.timer = threading.Timer(1,self.watchdog)
         self.timer.start()
     def complete(self):
         return self.num_of_seq == len(self.fparts.keys())
+    def stopdl(self):
+        self.timer.cancel()
+        self.stopped = True
+    def startdl(self):
+        self.timer = threading.Timer(1,self.watchdog)
+        self.timer.start()
+        self.started = True
     def unpack(self,path):
         logging.debug("beginning to write file")
         try:
@@ -38,8 +46,8 @@ class McFile():
             if not i in self.fparts.keys():
                 logging.debug("demanding",i)
                 d += "%d "%i
-        logging.info("/fmoar %s %d %s"%(
-            self.filename,self.num_of_seq,d))
+        #logging.debug("/fmoar %s %d %s"%(
+        #    self.filename,self.num_of_seq,d))
         self.chat.send_mc("/fmoar %s %d %s"%(
             self.filename,self.num_of_seq,d))
         self.timer = threading.Timer(1,self.watchdog)
@@ -59,7 +67,7 @@ class remoteParser(parser):
         """
         
         args = ' '.join(shlex.split(' '.join(args)))
-        logging.debug(args)
+        logging.debug("%s"%args)
         msg = "'%s' now known as '%s'" % (self.chat.resolveNick(addr[0]),args)
         self.chat.iplist[addr[0]].nick = args
         return  msg
@@ -233,17 +241,33 @@ class remoteParser(parser):
         pass
 
     def fmoar(self,args,addr):
+        """ sends moar of the requested file """
+        fname = args[0]
+        num_of_seq = args[1]
+        seq_nrs = args[2:]
+        logging.debug("%s"%seq_nrs)
+        fi = self.chat.out_files.get(fname,None)
+        if fi is None:
+            return # kick the messages which are not for us
+        for i in seq_nrs: #send the requested messages to the network
+            fi.send_chunk(int(i))
+    def fget(self):
+        """docstring for fget"""
+
         pass
     def fpart(self,args,addr):
+        """ parses fpart messages and saves the content into the 
+        corresponding file """
+
         curr_file = self.chat.files.get(args[0],None)
         if curr_file is None:
-            curr_file = self.chat.files[args[0]] = McFile(args[0], args[1],chat=self.chat)
-
+            curr_file = self.chat.files[args[0]] = InFile(args[0], args[1],chat=self.chat)
+        if curr_file.stopped:
+            return
         #                  seqnr         data 
         curr_file.fparts[int(args[2])] = args[3]
-        print curr_file.num_of_seq , len(curr_file.fparts)
-
-        print curr_file.num_of_seq == len(curr_file.fparts)
+        #print curr_file.num_of_seq , len(curr_file.fparts)
+        #print curr_file.num_of_seq == len(curr_file.fparts)
         if curr_file.complete() and curr_file.num_of_seq is int(args[1]):
             # unpack the file and write to disk
             print "finished with file %s"%curr_file.filename
@@ -253,7 +277,7 @@ class remoteParser(parser):
         else:
             if curr_file.num_of_seq != int(args[1]):
                 logging.warn("num of sequences CHANGED! Restarting Download")
-                curr_file = self.chat.files[args[0]] = McFile(args[0], 
+                curr_file = self.chat.files[args[0]] = InFile(args[0], 
                         args[1],chat=self.chat)
             """
             try:
@@ -264,6 +288,3 @@ class remoteParser(parser):
                 pass
             """
             pass
-
-
-        return 
