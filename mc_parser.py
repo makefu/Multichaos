@@ -5,6 +5,7 @@ import sys
 from time import time
 import logging
 import random
+import string
 # default values
 logging.basicConfig(level=logging.INFO)
 class HistItem():
@@ -23,7 +24,7 @@ class Node():
             self.nick=ip
         self.ip=ip
         if color is None:
-            self.color = random.randint(30,37)
+            self.color = random.randint(32,35)
         else:
             self.color = color
         if ram is None:
@@ -47,12 +48,10 @@ class parser():
         self.chat = chat
 
 class ownParser(parser):
-    """
-    parses local command calls ( like /nick or /togglebeep )
+    """ parses local command calls ( like /nick or /togglebeep )
     initial parsing is done with the "parse" function"
     it will evaluate the function given and tries to call
-    the function with that name
-
+    the function with that name 
     """
     def __init__(self,chat):
         """ """
@@ -149,7 +148,10 @@ class remoteParser(parser):
         parser.__init__(self,chat)
     def nick(self,args,addr):
         """the nick will be associated with the ip-address the message it is from
-        the iplist associated will be changed for that """
+        the iplist associated will be changed for that 
+        %MC% sets the nick name for your ip-address
+        usage: \\nick "bob Ros$"
+        """
         
         args = ' '.join(shlex.split(' '.join(args)))
         logging.debug(args)
@@ -167,7 +169,7 @@ class remoteParser(parser):
         against the generated one.
         This should happen only once ( at beginning of the session)
 
-        if the challenge is not taken, the message will be printed out """
+        if the challenge is not taken, the message will be printed out"""
         if int(args[-1]) == self.chat.rnd and self.chat.ip is None:
             print "challenge succeeded. Found your IP: %s"%addr[0]
             self.chat.ip=addr[0]
@@ -178,7 +180,8 @@ class remoteParser(parser):
         """Parses beep messages.
         These may contain a frequency and a length
         The parameters  will be passed to the "beep" program with the
-        corresponding flags """
+        corresponding flags 
+        %MC% When activated by user, a beep tone will be produced.  Default tone length is 1000, default frequency is 2000"""
         if self.chat.beep==False:
             return "beeping is turned off, ignoring request from %s with freq/length %s"% (addr[0],args)
         cmd = [ "/usr/bin/beep" ]
@@ -199,33 +202,50 @@ class remoteParser(parser):
         return "%s demands beep (%s)" % (self.chat.resolveNick(addr[0]) ,args)
 
     def espeak(self,args,addr):
-        """when activated, will say args via espeak voice synthesizer"""
+        """when activated, will say args via espeak voice synthesizer
+        %MC% when activated by user, a synthesized voice will be produced by the machine.
+        """
         if self.chat.espeak==False:
             return "espeak is turned off,ignoring request from %s with args %s" % (addr[0], args)
         cmd = [ "/usr/bin/espeak" ]
         cmd.extend(args)
         p = subprocess.Popen(cmd)
         return "%s demands '%s'" %(self.chat.resolveNick(addr[0]),args)
+    def isMcFunct(self,funct):
+        if funct.__doc__ is None:
+            logging.warning("function %s has no docstring"%funct)
+            return False
+        return "%MC%" in funct.__doc__ 
     def caps(self,cmd,addr):
-        """writes the capabilities to the multicast channel"""
+        """writes the capabilities to the multicast channel
+        %MC% returns the available capabilities of this client. Specific help can be retrieved by appending the function name to the caps-command 
+        usage: /caps beep espeak """
         ret = ""
         if len(cmd) is 0:
-            ret = dir(self)
+            for  r in dir(self):
+                h = getattr(self,r)
+                if self.isMcFunct(h):
+                    ret += "%s "% r
+            self.chat.send_mc("/echo \"%s\""%ret)
         else:
             for i in cmd:
                 ret += "%s: "%i  
                 try:
                     fun = getattr(self,i)
-                    ret += "%s"%fun.__doc__.strip()
+                    index = string.find(fun.__doc__,"%MC%")
+                    index +=4
+                    ret += "%s"% fun.__doc__[index:]
                 except Exception as e:
-                    ret += "No such function\n %s"%e
-        self.chat.send_mc("/echo %s"%ret)
+                    ret += "No such function"# %s"%e
+                self.chat.send_mc("/echo \"%s\""%ret)
+                ret = ""
+
         return
                 
-
-        return 
     def echo (self,args,addr):
-        """ replaces the original ``chat'' """
+        """ replaces the original ``chat'' 
+        %MC% Original Chat mode, messages will be written like a normal text message by the user
+        """
         args = " ".join(args)
         logging.debug("echo COLOR: %d"%self.chat.iplist[addr[0]].color)
         return "[%dm%s[0m: %s"%(self.chat.iplist[addr[0]].color,self.chat.resolveNick(addr[0]), args)
@@ -234,7 +254,8 @@ class remoteParser(parser):
         the message should contain a function and a number of 
         parameters together in one string:
         /beep 1000 230
-        If there is no such function, the exception will be catched and printed """
+        If there is no such function, the exception will be catched and printed 
+        """
         if not self.chat.iplist.has_key(addr[0]):
             self.chat.iplist[addr[0]] = Node(addr[0])
         self.chat.iplist[addr[0]].hst.append( HistItem(time(),cmd ) )
@@ -248,12 +269,16 @@ class remoteParser(parser):
             return "no such remote command '/%s' : %s" %(cmd,e)
 
     def pset(self,args,addr):
-         """saves a ``private'' value for a node"""
+         """saves a ``private'' value for a node
+         %MC% Saves a private key-value pair on this machine
+         """
          self.chat.iplist[addr[0]].ram[args[0]]=' '.join(args[1:])
          return "for %s: saved %s => %s" %(addr[0],args[0],' '.join(args[1:]))
 
     def pget(self,args,addr):
-        """tries to retrieve value based on a given key"""
+        """tries to retrieve value based on a given key
+        %MC% Tries to retrieve a given key from the private storage of this machine
+        """
         ret = self.chat.iplist[addr[0]].ram.get(args[0],None)
         if ret is None:
             self.chat.send_mc("/error 404 Not Found")
@@ -261,14 +286,18 @@ class remoteParser(parser):
             self.chat.send_mc("/value %s %s"%(args[0].replace('"','\\"'),ret.replace('"','\\"')))
 
     def set(self,args,addr):
-        """ globally sets a value in all multicast nodes """
+        """ globally sets a value in all multicast nodes 
+        %MC% saves a global variable ( available for everyone in the Multicast )
+        """
         logging.debug("SET %s"%args)
         k = args[0]             
         v = " ".join(args[1:]) 
         self.chat.gset(k,v)
-        return "saved globally %s = %s"%(k,v)
+        return "saved globaly %s = %s"%(k,v)
     def get(self,args,addr):
-        """ tries to retrieve a value globally saved in the struct """
+        """ tries to retrieve a value globally saved in the struct 
+        %MC% tries to retrieve a value from the global key-value storage of this node
+        """
         ret = self.chat.gget(args[0])
         # thy shall not unescape thy single ' when inside thy double "
         key = args[0].replace('"','\\"')#.replace('\'','\\\'')
