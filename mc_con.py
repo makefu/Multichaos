@@ -6,7 +6,7 @@ import struct
 import mc_parser
 from select import select
 from threading import Thread
-
+import mc_remote
 #defaults
 GROUP = '224.110.42.23'
 PORT  = 42023
@@ -36,6 +36,7 @@ class chatter():
         self.beep = False
         self.espeak = True
         self.gram= {}
+        self.files = {}
     def send_mc(self,arg):
         self.s.sendto("%s" %
                 arg,0,(self.group,self.port))
@@ -158,7 +159,7 @@ class printThread(Thread):
         self.s=sock
         self.stop=0
         self.chat=chat
-        self.remoteParser= mc_parser.remoteParser(self.chat)
+        self.remoteParser= mc_remote.remoteParser(self.chat)
     def run(self,*args):
         '''
         Thread function
