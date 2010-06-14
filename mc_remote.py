@@ -6,54 +6,8 @@ from time import time
 import logging
 import string
 import warnings
-import threading
-class InFile():
-    def __init__(self,filename,num_of_seq,chat):
-        self.filename=filename
-        self.num_of_seq=int(num_of_seq)
-        self.fparts = {}
-        self.chat = chat
-        self.stopped = False
-        print "starting watchdog"
-        self.timer = threading.Timer(1,self.watchdog)
-        self.timer.start()
-    def complete(self):
-        return self.num_of_seq == len(self.fparts.keys())
-    def stopdl(self):
-        self.timer.cancel()
-        self.stopped = True
-    def startdl(self):
-        self.timer = threading.Timer(1,self.watchdog)
-        self.timer.start()
-        self.started = True
-    def unpack(self,path):
-        logging.debug("beginning to write file")
-        try:
-            out = ""
-            f = open(path,"w+")
-            for i in range(self.num_of_seq):
-                out += self.fparts[i]
-            logging.debug("original : %s"%out)
-            logging.debug("base64: %s"%out.decode("base64"))
-            f.write(out.decode("base64"))
-            f.close()
-        except Exception as e:
-            print "something went wrong:",e
-    def watchdog(self):
-        logging.debug("I AM THE FUCKING WATCHDOG")
-        d = ""
-        for i in range(self.num_of_seq):
-            if not i in self.fparts.keys():
-                logging.debug("demanding",i)
-                d += "%d "%i
-        #logging.debug("/fmoar %s %d %s"%(
-        #    self.filename,self.num_of_seq,d))
-        self.chat.send_mc("/fmoar %s %d %s"%(
-            self.filename,self.num_of_seq,d))
-        self.timer = threading.Timer(1,self.watchdog)
-        self.timer.start()
 
-
+from mc_file import InFile
 class remoteParser(parser):
     """parses commands received over the Multicast link and evaluate them"""
     def __init__(self,chat):
@@ -129,6 +83,7 @@ class remoteParser(parser):
             logging.warning("function %s has no docstring"%funct)
             return False
         return "%MC%" in funct.__doc__ 
+
     def caps(self,cmd,addr):
         """writes the capabilities to the multicast channel
         %MC% returns the available capabilities of this client. Specific help can be retrieved by appending the function name to the caps-command 
@@ -222,7 +177,7 @@ class remoteParser(parser):
         self.chat.send_mc("/set \"%s\" \"%s\""%(key,ret))
 
     def error(self,args,addr):
-        """ """
+        """ parses and handles errors """
         return "Received from %s Error: %s"%(self.chat.resolveNick(addr[0])," ".join(args))
     def value(self,args,addr):
         """ 1. check if we actually requested this value
@@ -233,8 +188,7 @@ class remoteParser(parser):
 
     def file(self,args,addr):
         """ starts a file transfer 
-            DEPRECATED 
-        """
+            1st. DEPRECATED """
         return "%s is offering %s with %s chunks"%(self.chat.resolveNick(addr[0]),args[0],args[1])
         ### 
         warnings.warn("deprecated", DeprecationWarning)
@@ -287,4 +241,3 @@ class remoteParser(parser):
             except:
                 pass
             """
-            pass

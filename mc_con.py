@@ -1,20 +1,19 @@
 #!/usr/bin/python
-from socket import *
+from socket import socket, AF_INET,SOCK_DGRAM,IPPROTO_UDP,SOL_SOCKET,SO_REUSEADDR,IP_MULTICAST_TTL,IP_MULTICAST_LOOP,INADDR_ANY,inet_aton,IP_ADD_MEMBERSHIP,IPPROTO_IP
 import random
 import sys,signal
 import struct
-import mc_parser
 from select import select
 from threading import Thread
-import mc_remote
-import logging
+from mc_remote import remoteParser
+from mc_local import localParser
 #defaults
 GROUP = '224.110.42.23'
 PORT  = 42023
 CLIENTNAME = "Bob Ross"
 MCMESSAGE="/hello \"%s\" Says Hello! \"%s\""
-chat=None
 # end defaults
+var = None
 class chatter():
     '''
         initializes a chat socket
@@ -33,7 +32,7 @@ class chatter():
         self.port=port
         self.nick=nick
         self.iplist =  {}
-        self.ownParser= mc_parser.ownParser(self)
+        self.localParser= localParser(self)
         self.beep = False
         self.espeak = True
         self.gram= {}
@@ -43,11 +42,12 @@ class chatter():
     def send_mc(self,arg):
         self.s.sendto("%s" %
                 arg,0,(self.group,self.port))
-    def gset(self,key,value):
+    def gset(self,key,value): 
         """
         here you may want to add some persistency stuff
         """
         self.gram[key] = value
+
     def gget(self,key):
         """
         persistency goes here
@@ -80,10 +80,10 @@ class chatter():
         # generate seed
         self.rnd = random.randint(42,23000)
         self.s.sendto(MCMESSAGE % ( self.nick, self.rnd),0, (self.group,self.port))
-        self.ownParser.nick((self.nick,))
+        self.localParser.nick((self.nick,))
     def send(self,msg=""):
         if msg.startswith('/'):
-            ret= self.ownParser.parse(msg) 
+            ret= self.localParser.parse(msg) 
             if ret is not None:
                 print ret
         else:
@@ -123,8 +123,13 @@ class chatter():
             self.rcvthread.killfunct=killthreadfunct
 
         self.rcvthread.start()
-        
     def cleanup(self):
+        """
+        public function, wrapper for _cleanup, which is used for
+        the signal and does what we need to have
+        """
+        self._cleanup(1,2)
+    def _cleanup(self,sig,frame):
         '''
         cleans up the socket and kills the read-thread
         '''
@@ -133,19 +138,7 @@ class chatter():
         self.rcvthread.killfunct()
         self.rcvthread.join(1)
         self.s.close()
-        
-def handler(signum,frame):
-    '''
-    handler for SIGINT
-    '''
-    print "shutting down"
-    global chat
-    chat.cleanup()
-    sys.exit()
-
-
-
-
+        sys.exit()
 
 class printThread(Thread):
     '''
@@ -162,7 +155,7 @@ class printThread(Thread):
         self.s=sock
         self.stop=0
         self.chat=chat
-        self.remoteParser= mc_remote.remoteParser(self.chat)
+        self.remoteParser= remoteParser(self.chat)
     def run(self,*args):
         '''
         Thread function
@@ -190,15 +183,16 @@ class printThread(Thread):
                         default case : no /command
                         """
                         print "%s: %s"%(self.chat.resolveNick(addr[0]), data)
+
     def requeststop(self):
         '''
         sets stop to 1
         '''
         self.stop=1
 def main():
-    global chat
     chat = chatter()
-    signal.signal(signal.SIGINT,handler)
+    signal.signal(signal.SIGINT,chat._cleanup)
+    registerChat(chat)
     chat.initSocket()
     chat.threadedRecv()
     while 1:
@@ -208,6 +202,15 @@ def main():
         except KeyboardInterrupt:
             chat.cleanup()
             break
+
+def registerChat(chat):
+    """ registers ONE global variable, needed for the chat """
+    global glob
+    glob = chat
+
+def cleanup(chat):
+    global glob
+    glob.cleanup()
 
 if __name__ == "__main__":
     main()
