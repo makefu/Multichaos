@@ -7,7 +7,7 @@ import logging
 import string
 import warnings
 
-from mc_file import InFile
+from mc_file import IOFile
 class remoteParser(parser):
     """parses commands received over the Multicast link and evaluate them"""
     def __init__(self,chat):
@@ -215,7 +215,7 @@ class remoteParser(parser):
 
         curr_file = self.chat.files.get(args[0],None)
         if curr_file is None:
-            curr_file = self.chat.files[args[0]] = InFile(args[0], args[1],chat=self.chat)
+            curr_file = self.chat.files[args[0]] = IOFile(self.chat,filename=args[0], numchunks=int(args[1]))
         if curr_file.stopped:
             return
         #                  seqnr         data 

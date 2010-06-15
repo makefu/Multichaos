@@ -1,7 +1,7 @@
 import logging
 import warnings
 from mc_parser import parser
-from mc_file import OutFile
+from mc_file import IOFile
 
 class localParser(parser):
     """ parses local command calls ( like /nick or /togglebeep )
@@ -132,7 +132,7 @@ class localParser(parser):
         if not curr_file.complete():
             warnings.warn("download not yet completed!")
         else:
-            outfile= args[1] if len(args) is 2 else args[0]
+            outfile = args[1] if len(args) is 2 else args[0]
             curr_file.unpack(outfile)
             print "unpacking %s to %s" %(args[0],outfile)
 
@@ -158,17 +158,27 @@ class localParser(parser):
         return "Loglevel is now at %s"%args[0]
 
     def sendsf(self,args):
-        """ send string via file interface """
+        """ send string via file interface"""
         fname = args[0] if len(args) > 0 else "custom_string"
         st    = args[1] if len(args) > 1 else "THIS IS A TEST STRRIIIIING"*2000
-        chsz  = int(args[2]) if len(args) > 2 else 900
+        chsz  = int(args[2]) if len(args) > 2 else 901
             
-        aut = self.chat.out_files[fname]= OutFile(fname,st,chsz,self.chat)
+        aut = self.chat.files[fname]= IOFile(self.chat,fname,st,chsz)
         aut.send_out()
+    def loadfile(self,args):
+        fname = args[0] 
+        if self.chat.files.get(fname,None) is not None:
+            warnings.warn("overwriting existing file!")
+        chsz = int(args[2]) if len(args) > 1 else 901
+        with open(fname) as fil:
+                self.chat.files[fname] = IOFile(self.chat,fname,chsz,fil.read())
 
     def sendfile(self,args):
         fname = args[0] if len(args) > 0 else "sample_file"
-        f = open(fname,'r')
-        out = f.read()
-        f.close()
-        self.sendsf((fname,out))
+        if self.chat.files.get(fname,None) is not None:
+            self.info("will not load existing file again, load if you still want to send a new file!")
+        else:
+            self.loadFile(fname)
+        fil = self.chat.files.get(fname,None)
+        assert fil is not None # this should never happen(TM)
+        
