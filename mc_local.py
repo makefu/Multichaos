@@ -1,5 +1,6 @@
 import logging
 import warnings
+import os
 from mc_parser import parser
 from mc_file import IOFile
 
@@ -124,7 +125,14 @@ class localParser(parser):
             else: # running
                 compstr = "[31m[-][0m" 
             print "%s %s : %d of %d fparts"%(
-                    compstr,v.filename,len(v.fparts.keys()),v.num_of_seq)
+                    compstr,v.fname,len(v.fparts.keys()),v.numchunks)
+    def ls(self,args):
+        directory = args[0] if len(args) > 0 else "."
+        return os.listdir(directory)
+    def cd(self,args):
+        if len(args[0]) is 0:
+            return "need to supply a path"
+        os.chdir(args[0])
 
     def saveas(self,args):
         """ saves a download to the file to a specific place"""
@@ -157,13 +165,14 @@ class localParser(parser):
         logging.basicConfig(level=int(args[0]))
         return "Loglevel is now at %s"%args[0]
 
+
     def sendsf(self,args):
         """ send string via file interface"""
         fname = args[0] if len(args) > 0 else "custom_string"
         st    = args[1] if len(args) > 1 else "THIS IS A TEST STRRIIIIING"*2000
         chsz  = int(args[2]) if len(args) > 2 else 901
             
-        aut = self.chat.files[fname]= IOFile(self.chat,fname,st,chsz)
+        aut = self.chat.files[fname]= IOFile(self.chat,filename=fname,st=st,chunksize=chsz)
         aut.send_out()
     def loadfile(self,args):
         fname = args[0] 

@@ -9,7 +9,7 @@ import warnings
 
 from mc_file import IOFile
 class remoteParser(parser):
-    """parses commands received over the Multicast link and evaluate them"""
+    """ parses commands received over the Multicast link and evaluate them"""
     def __init__(self,chat):
         """ Internal function """
         parser.__init__(self,chat)
@@ -138,15 +138,13 @@ class remoteParser(parser):
 
     def pset(self,args,addr):
          """saves a ``private'' value for a node
-         %MC% Saves a private key-value pair on this machine
-         """
+         %MC% Saves a private key-value pair on this machine """
          self.chat.iplist[addr[0]].ram[args[0]]=' '.join(args[1:])
          return "for %s: saved %s => %s" %(addr[0],args[0],' '.join(args[1:]))
 
     def pget(self,args,addr):
         """tries to retrieve value based on a given key
-        %MC% Tries to retrieve a given key from the private storage of this machine
-        """
+        %MC% Tries to retrieve a given key from the private storage of this machine """
         ret = self.chat.iplist[addr[0]].ram.get(args[0],None)
         if ret is None:
             self.chat.send_mc("/error 404 Not Found")
@@ -155,8 +153,7 @@ class remoteParser(parser):
 
     def set(self,args,addr):
         """ globally sets a value in all multicast nodes 
-        %MC% saves a global variable ( available for everyone in the Multicast )
-        """
+        %MC% saves a global variable ( available for everyone in the Multicast ) """
         logging.debug("SET %s"%args)
         k = args[0]             
         v = " ".join(args[1:]) 
@@ -164,8 +161,7 @@ class remoteParser(parser):
         return "saved globaly %s = %s"%(k,v)
     def get(self,args,addr):
         """ tries to retrieve a value globally saved in the struct 
-        %MC% tries to retrieve a value from the global key-value storage of this node
-        """
+        %MC% tries to retrieve a value from the global key-value storage of this node """
         ret = self.chat.gget(args[0])
         # thy shall not unescape thy single ' when inside thy double "
         key = args[0].replace('"','\\"')#.replace('\'','\\\'')
@@ -197,7 +193,7 @@ class remoteParser(parser):
     def fmoar(self,args,addr):
         """ sends moar of the requested file """
         fname = args[0]
-        num_of_seq = args[1]
+        numchunks = args[1]
         seq_nrs = args[2:]
         logging.debug("%s"%seq_nrs)
         fi = self.chat.out_files.get(fname,None)
@@ -220,19 +216,16 @@ class remoteParser(parser):
             return
         #                  seqnr         data 
         curr_file.fparts[int(args[2])] = args[3]
-        #print curr_file.num_of_seq , len(curr_file.fparts)
-        #print curr_file.num_of_seq == len(curr_file.fparts)
-        if curr_file.complete() and curr_file.num_of_seq is int(args[1]):
+        if curr_file.complete() and curr_file.numchunks is int(args[1]):
             # unpack the file and write to disk
-            print "finished with file %s"%curr_file.filename
-            #curr_file.unpack("here")
+            #print "finished with file %s"%curr_file.fname
             curr_file.timer.cancel()
             curr_file = None
         else:
-            if curr_file.num_of_seq != int(args[1]):
+            if curr_file.numchunks != int(args[1]):
                 logging.warn("num of sequences CHANGED! Restarting Download")
-                curr_file = self.chat.files[args[0]] = InFile(args[0], 
-                        args[1],chat=self.chat)
+                curr_file = self.chat.files[args[0]] = IOFile(filename=args[0], 
+                        numchunks=int(args[1]),chat=self.chat)
             """
             try:
                 curr_file.timer.cancel()

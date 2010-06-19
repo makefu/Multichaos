@@ -4,28 +4,28 @@ class IOFile:
     def __init__(self,chat,filename,chunksize=901,st=None,numchunks=0):
         self.fname = filename
         self.chat = chat
+        self.timer = threading.Timer(1,self.watchdog)
         if st is not None:
             # then generate chunks from the provided string
-
+            print "adding iofile"
             self.fparts = self._to_chunks(st,chunksize)
-            self.numchunks = len(self.chunks)
+            self.numchunks = len(self.fparts)
         else:
             self.fparts = {}
             self.numchunks = numchunks
             self.chunksize = None
-            self.timer = threading.Timer(1,self.watchdog)
             self.timer.start()
         pass
         self.stopped = False
     def _to_chunks(self,st,chunksize):
-        ret = []
+        ret = {}
         rest = st.encode("base64").replace('\n','')
+        i=0
         while len(rest) > chunksize:
-            ret.append(rest[:chunksize])
-            #print ret
+            ret[i]=rest[:chunksize]
             rest = rest[chunksize:]
-            #print rest
-        ret.append(rest)
+            i +=1
+        ret[i] = rest
         return ret
     def send_out(self):
         for i in range(self.numchunks):
@@ -34,7 +34,7 @@ class IOFile:
     def send_chunk(self,chid):
             logging.debug("sending file :%s num %d"%(self.fname,chid))
             self.chat.send_mc("/fpart %s %d %d %s" %(
-                self.fname,self.numchunks,chid,self.chunks[chid]))
+                self.fname,self.numchunks,chid,self.fparts[chid]))
     def watchdog(self):
         """ watcher function which tries to
         find ``missed'' chunks and demands them via
@@ -46,9 +46,8 @@ class IOFile:
                 logging.debug("For %s demanding %s"%(self.fname,i))
                 d += "%d "%i
         #logging.debug("/fmoar %s %d %s"%(
-        #    self.filename,self.numchunks,d))
         self.chat.send_mc("/fmoar %s %d %s"%(
-            self.filename,self.numchunks,d))
+            self.fname,self.numchunks,d))
         self.timer = threading.Timer(1,self.watchdog)
         self.timer.start()
 

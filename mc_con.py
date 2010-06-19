@@ -2,6 +2,7 @@
 from socket import socket, AF_INET,SOCK_DGRAM,IPPROTO_UDP,SOL_SOCKET,SO_REUSEADDR,IP_MULTICAST_TTL,IP_MULTICAST_LOOP,INADDR_ANY,inet_aton,IP_ADD_MEMBERSHIP,IPPROTO_IP
 import random
 import sys,signal
+import os
 import struct
 from select import select
 from threading import Thread
@@ -37,7 +38,7 @@ class chatter():
         self.espeak = True
         self.gram= {}
         self.files = {}
-        self.out_files = {}
+        self.currdir = os.curdir
     
     def send_mc(self,arg):
         self.s.sendto("%s" %
