@@ -37,12 +37,16 @@ class localParser(parser):
         self.chat.iplist.clear()
         return "nicks flushed"
 
+    def encoding(self,args):
+        enc = "ascii" if len(args) == 0 else args[0]
+        self.chat.encoding = args[0]
     def nick(self,args):
         """writes our new nick onto the line"""
         arg = ' '.join(args)
         self.chat.send_mc("/nick \"%s\"" % args )
         #return "You are now known as %s" % args
-
+    def echo8(self,args):
+        self.chat.send_mc(args[0].encode("UTF-8"))
     def espeak(self,args):
         """ """
         args = ' '.join(args)
@@ -152,7 +156,7 @@ class localParser(parser):
     def killdl(self,args):
         curr_file = self.chat.files[args[0]]
         curr_file.stopdl()
-        curr_file = None
+        self.chat.files[args[0]] = None
         return "killed %s"%args[0]
 
     def startdl(self,args):
@@ -185,9 +189,9 @@ class localParser(parser):
     def sendfile(self,args):
         fname = args[0] if len(args) > 0 else "sample_file"
         if self.chat.files.get(fname,None) is not None:
-            self.info("will not load existing file again, load if you still want to send a new file!")
+            logging.info("will not load existing file again, load if you still want to send a new file!")
         else:
-            self.loadFile(fname)
+            self.loadfile([fname])
         fil = self.chat.files.get(fname,None)
         assert fil is not None # this should never happen(TM)
-        
+        fil.send_out()

@@ -36,11 +36,13 @@ class chatter():
         self.localParser= localParser(self)
         self.beep = False
         self.espeak = True
+        self.encoding = "utf-8"
         self.gram= {}
         self.files = {}
         self.currdir = os.curdir
     
     def send_mc(self,arg):
+        arg = arg.encode(self.encoding)
         self.s.sendto("%s" %
                 arg,0,(self.group,self.port))
     def gset(self,key,value): 
@@ -80,8 +82,9 @@ class chatter():
         random.seed()
         # generate seed
         self.rnd = random.randint(42,23000)
-        self.s.sendto(MCMESSAGE % ( self.nick, self.rnd),0, (self.group,self.port))
+        self.send_mc(MCMESSAGE % ( self.nick, self.rnd))
         self.localParser.nick((self.nick,))
+
     def send(self,msg=""):
         if msg.startswith('/'):
             ret= self.localParser.parse(msg) 
@@ -91,7 +94,7 @@ class chatter():
             """
             this is the default case
             """
-            self.s.sendto("/echo %s" %msg,0,(self.group,self.port))
+            self.send_mc("/echo %s" %msg)
 
     def resolveNick(self,ip):
         '''
@@ -175,15 +178,23 @@ class printThread(Thread):
             for r in ready:
                 if r == self.s:
                     (data,addr) = self.s.recvfrom(1024)
+                    print type(data)
+                    data = str(data.decode(self.chat.encoding))
+                    print type(data)
                     if data.startswith('/'):
                         ret=self.remoteParser.parse(data,addr)
                         if ret is not None:
-                            print "%s" %ret
+                            try:
+                                print "%s" %(ret)
+                            except:
+                                print "malformed return value"
                     else:
                         """
                         default case : no /command
                         """
-                        print "%s: %s"%(self.chat.resolveNick(addr[0]), data)
+
+                        print "%s: %s"%(self.chat.resolveNick(addr[0]),
+                                data.encode(self.chat.encoding))
 
     def requeststop(self):
         '''

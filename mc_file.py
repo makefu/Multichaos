@@ -33,7 +33,7 @@ class IOFile:
             self.send_chunk(i)
     def send_chunk(self,chid):
             logging.debug("sending file :%s num %d"%(self.fname,chid))
-            self.chat.send_mc("/fpart %s %d %d %s" %(
+            self.chat.send_mc("/fpart \"%s\" \"%d\" \"%d\" \"%s\"" %(
                 self.fname,self.numchunks,chid,self.fparts[chid]))
     def watchdog(self):
         """ watcher function which tries to
@@ -46,7 +46,7 @@ class IOFile:
                 logging.debug("For %s demanding %s"%(self.fname,i))
                 d += "%d "%i
         #logging.debug("/fmoar %s %d %s"%(
-        self.chat.send_mc("/fmoar %s %d %s"%(
+        self.chat.send_mc("/fmoar %s %d \"%s\""%(
             self.fname,self.numchunks,d))
         self.timer = threading.Timer(1,self.watchdog)
         self.timer.start()

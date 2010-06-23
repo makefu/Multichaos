@@ -1,1 +1,17 @@
 Repostitory for python-multicast client
+currently implemented features:
+- find own ip ( via cookie )
+- beep   ( turn on/off)
+- espeak ( turn on/off)
+- history for every participant 
+- virtual file storage
+    - load files
+    - send files via multicast
+    - send generic strings
+    - list current downloads
+    - automagically request missed packets
+- python on-the-fly statement evaluation
+- request client capabilities
+- rot13 encoding
+- raw message on multicast group
+-

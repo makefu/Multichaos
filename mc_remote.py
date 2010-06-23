@@ -134,7 +134,7 @@ class remoteParser(parser):
         try:
             return getattr(self,funct)(cmd[1:],addr)
         except Exception as e:
-            return "no such remote command '/%s' : %s" %(cmd,e)
+            return "FAIL: '/%s': %s" %(cmd,e)
 
     def pset(self,args,addr):
          """saves a ``private'' value for a node
@@ -181,24 +181,28 @@ class remoteParser(parser):
         3. do something with it
         4. probably save it if its already global """
         return "Received from %s : %s = %s" %(self.chat.resolveNick(addr[0]),args[0]," ".join(args[1:]))
-
     def file(self,args,addr):
-        """ starts a file transfer 
-            1st. DEPRECATED """
+        """ starts a file transfer """
+        fi = self.chat.files.get(args[0],None)
+        if fi is None:
+            logging.debug("Do not have requested file %s "%args[0])
+        if fi.complete():
+            fi.send_out()
+        else:
+            return "Do not have requested file complete: %s"%fi
         return "%s is offering %s with %s chunks"%(self.chat.resolveNick(addr[0]),args[0],args[1])
         ### 
         warnings.warn("deprecated", DeprecationWarning)
         pass
-
     def fmoar(self,args,addr):
         """ sends moar of the requested file """
         fname = args[0]
         numchunks = args[1]
         seq_nrs = args[2:]
         logging.debug("%s"%seq_nrs)
-        fi = self.chat.out_files.get(fname,None)
-        if fi is None:
-            return # kick the messages which are not for us
+        fi = self.chat.files.get(fname,None)
+        if fi is None and not fi.complete():
+            return ""# kick the messages which are not for us
         for i in seq_nrs: #send the requested messages to the network
             fi.send_chunk(int(i))
     def fget(self):
@@ -213,7 +217,7 @@ class remoteParser(parser):
         if curr_file is None:
             curr_file = self.chat.files[args[0]] = IOFile(self.chat,filename=args[0], numchunks=int(args[1]))
         if curr_file.stopped:
-            return
+            return ""
         #                  seqnr         data 
         curr_file.fparts[int(args[2])] = args[3]
         if curr_file.complete() and curr_file.numchunks is int(args[1]):
