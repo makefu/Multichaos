@@ -42,9 +42,13 @@ class chatter():
         self.currdir = os.curdir
     
     def send_mc(self,arg):
-        arg = arg.encode(self.encoding)
-        self.s.sendto("%s" %
-                arg,0,(self.group,self.port))
+        try:
+            arg = arg.encode(self.encoding)
+            self.s.sendto("%s" %
+                    arg,0,(self.group,self.port))
+        except Exception as e:
+            print "IN send_mc:%s"%e
+
     def gset(self,key,value): 
         """
         here you may want to add some persistency stuff
@@ -178,9 +182,11 @@ class printThread(Thread):
             for r in ready:
                 if r == self.s:
                     (data,addr) = self.s.recvfrom(1024)
-                    print type(data)
-                    data = str(data.decode(self.chat.encoding))
-                    print type(data)
+                    try:
+                        data = str(data.decode(self.chat.encoding))
+                    except Exception as e:
+                        print "FAIL:%s"%e
+
                     if data.startswith('/'):
                         ret=self.remoteParser.parse(data,addr)
                         if ret is not None:
@@ -194,7 +200,7 @@ class printThread(Thread):
                         """
 
                         print "%s: %s"%(self.chat.resolveNick(addr[0]),
-                                data.encode(self.chat.encoding))
+                                data)
 
     def requeststop(self):
         '''
