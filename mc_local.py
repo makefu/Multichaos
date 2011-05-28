@@ -42,8 +42,8 @@ class localParser(parser):
         self.chat.encoding = args[0]
     def nick(self,args):
         """writes our new nick onto the line"""
-        arg = ' '.join(args)
-        self.chat.send_mc("/nick \"%s\"" % args )
+        args = ' '.join(args)
+        self.chat.send_mc("/nick %s" % args )
         #return "You are now known as %s" % args
     def echo8(self,args):
         self.chat.send_mc(args[0].encode("UTF-8"))
